@@ -11,15 +11,15 @@
 
 void Meshes::load(std::string const &filename, Attributes const &attributes) {
 	std::ifstream file(filename, std::ios::binary);
-
 	GLuint vao = 0;
 	GLuint total = 0;
 	{ //read + upload data chunk:
 		struct v3n3 {
 			glm::vec3 v;
 			glm::vec3 n;
+			glm::vec3 c;
 		};
-		static_assert(sizeof(v3n3) == 24, "v3n3 is packed");
+		static_assert(sizeof(v3n3) == 36, "v3n3 is packed");
 		std::vector< v3n3 > data;
 		read_chunk(file, "v3n3", &data);
 
@@ -45,6 +45,12 @@ void Meshes::load(std::string const &filename, Attributes const &attributes) {
 			glEnableVertexAttribArray(attributes.Normal);
 		} else {
 			std::cerr << "WARNING: loading v3n3 data from '" << filename << "', but not using the Normal attribute." << std::endl;
+		}
+		if (attributes.Color != -1U) {
+			glVertexAttribPointer(attributes.Color, 4, GL_FLOAT, GL_FALSE, sizeof(v3n3), (GLbyte *)0 + 2 * sizeof(glm::vec3));
+			glEnableVertexAttribArray(attributes.Color);
+		} else {
+			std::cerr << "WARNING: loading v3n3 data from '" << filename << "', but not using the Color attribute." << std::endl;
 		}
 	}
 

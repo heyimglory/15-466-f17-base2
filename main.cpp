@@ -20,8 +20,8 @@ static GLuint link_program(GLuint vertex_shader, GLuint fragment_shader);
 int main(int argc, char **argv) {
 	//Configuration:
 	struct {
-		std::string title = "Game2: Scene";
-		glm::uvec2 size = glm::uvec2(640, 480);
+		std::string title = "Game2: Robot Fun Police";
+		glm::uvec2 size = glm::uvec2(640, 640);
 	} config;
 
 	//------------  initialization ------------
@@ -90,6 +90,7 @@ int main(int argc, char **argv) {
 	GLuint program = 0;
 	GLuint program_Position = 0;
 	GLuint program_Normal = 0;
+	GLuint program_Color = 0;
 	GLuint program_mvp = 0;
 	GLuint program_itmv = 0;
 	GLuint program_to_light = 0;
@@ -100,10 +101,13 @@ int main(int argc, char **argv) {
 			"uniform mat3 itmv;\n"
 			"in vec4 Position;\n"
 			"in vec3 Normal;\n"
+			"in vec3 Color;\n"
 			"out vec3 normal;\n"
+			"out vec3 color;\n"
 			"void main() {\n"
 			"	gl_Position = mvp * Position;\n"
 			"	normal = itmv * Normal;\n"
+			"	color = Color;\n"
 			"}\n"
 		);
 
@@ -111,10 +115,11 @@ int main(int argc, char **argv) {
 			"#version 330\n"
 			"uniform vec3 to_light;\n"
 			"in vec3 normal;\n"
+			"in vec3 color;\n"
 			"out vec4 fragColor;\n"
 			"void main() {\n"
 			"	float light = max(0.0, dot(normalize(normal), to_light));\n"
-			"	fragColor = vec4(light * vec3(1.0, 1.0, 1.0), 1.0);\n"
+			"	fragColor = vec4(light * color, 1.0);\n"
 			"}\n"
 		);
 
@@ -125,7 +130,8 @@ int main(int argc, char **argv) {
 		if (program_Position == -1U) throw std::runtime_error("no attribute named Position");
 		program_Normal = glGetAttribLocation(program, "Normal");
 		if (program_Normal == -1U) throw std::runtime_error("no attribute named Normal");
-
+		program_Color = glGetAttribLocation(program, "Color");
+		if (program_Color == -1U) throw std::runtime_error("no attribute named Color");
 		//look up uniform locations:
 		program_mvp = glGetUniformLocation(program, "mvp");
 		if (program_mvp == -1U) throw std::runtime_error("no uniform named mvp");
@@ -144,19 +150,19 @@ int main(int argc, char **argv) {
 		Meshes::Attributes attributes;
 		attributes.Position = program_Position;
 		attributes.Normal = program_Normal;
+		attributes.Color = program_Color;
 
-		meshes.load("meshes.blob", attributes);
+		meshes.load("meshes_robot.blob", attributes);
 	}
-	
-	//------------ scene ------------
 
+	//------------ scene ------------
 	Scene scene;
 	//set up camera parameters based on window:
 	scene.camera.fovy = glm::radians(60.0f);
 	scene.camera.aspect = float(config.size.x) / float(config.size.y);
 	scene.camera.near = 0.01f;
 	//(transform will be handled in the update function below)
-
+	
 	//add some objects from the mesh library:
 	auto add_object = [&](std::string const &name, glm::vec3 const &position, glm::quat const &rotation, glm::vec3 const &scale) -> Scene::Object & {
 		Mesh const &mesh = meshes.get(name);
@@ -176,7 +182,7 @@ int main(int argc, char **argv) {
 
 
 	{ //read objects to add from "scene.blob":
-		std::ifstream file("scene.blob", std::ios::binary);
+		std::ifstream file("scene_robot.blob", std::ios::binary);
 
 		std::vector< char > strings;
 		//read strings chunk:
@@ -204,29 +210,45 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	//create a weird waving tree stack:
-	std::vector< Scene::Object * > tree_stack;
-	tree_stack.emplace_back( &add_object("Tree", glm::vec3(1.0f, 0.0f, 0.2f), glm::quat(0.0f, 0.0f, 0.0f, 1.0f), glm::vec3(0.3f)) );
-	tree_stack.emplace_back( &add_object("Tree", glm::vec3(0.0f, 0.0f, 1.7f), glm::quat(0.0f, 0.0f, 0.0f, 1.0f), glm::vec3(0.9f)) );
-	tree_stack.emplace_back( &add_object("Tree", glm::vec3(0.0f, 0.0f, 1.7f), glm::quat(0.0f, 0.0f, 0.0f, 1.0f), glm::vec3(0.9f)) );
-	tree_stack.emplace_back( &add_object("Tree", glm::vec3(0.0f, 0.0f, 1.7f), glm::quat(0.0f, 0.0f, 0.0f, 1.0f), glm::vec3(0.9f)) );
+	// balloons
+	std::vector< Scene::Object * > balloon_stack;
+	balloon_stack.emplace_back( &add_object("Balloon1", glm::vec3(-2.2f, 2.3f, 3.0f), glm::quat(0.0f, 0.0f, 0.0f, 1.0f), glm::vec3(0.65f)) );
+	balloon_stack.emplace_back( &add_object("Balloon2", glm::vec3(1.7f, 2.6f, 1.5f), glm::quat(0.0f, 0.0f, 0.0f, 1.0f), glm::vec3(0.65f)) );
+	balloon_stack.emplace_back( &add_object("Balloon3", glm::vec3(-0.2f, -2.9f, 2.6f), glm::quat(0.0f, 0.0f, 0.0f, 1.0f), glm::vec3(0.65f)) );
 
-	for (uint32_t i = 1; i < tree_stack.size(); ++i) {
-		tree_stack[i]->transform.set_parent(&tree_stack[i-1]->transform);
+	std::vector< float > g_velocity(balloon_stack.size(), 0.0f);
+	std::vector< bool > balloon_exist(balloon_stack.size(), true);
+	
+	//poped
+	std::vector< Scene::Object * > poped_stack;
+	std::vector< float > pop_time;
+	
+	// the robot
+	std::vector< Scene::Object * > arm_stack;
+	arm_stack.emplace_back( &add_object("Base", glm::vec3(0.0f, 0.0f, 0.0f), glm::quat(0.0f, 0.0f, 0.0f, 1.0f), glm::vec3(1.0f)) );
+	arm_stack.emplace_back( &add_object("Link1", glm::vec3(0.0f, 0.0f, 0.6f), glm::quat(0.0f, 0.0f, 0.0f, 1.0f), glm::vec3(1.0f)) );
+	arm_stack.emplace_back( &add_object("Link2", glm::vec3(0.0f, 0.0f, 1.2f), glm::quat(0.0f, 0.0f, 0.0f, 1.0f), glm::vec3(1.0f)) );
+	arm_stack.emplace_back( &add_object("Link3", glm::vec3(0.0f, 0.0f, 1.2f), glm::quat(0.0f, 0.0f, 0.0f, 1.0f), glm::vec3(1.0f)) );
+
+	for (uint32_t i = 1; i <arm_stack.size(); ++i) {
+		arm_stack[i]->transform.set_parent(&arm_stack[i-1]->transform);
 	}
-
-	std::vector< float > wave_acc(tree_stack.size(), 0.0f);
-
+	
+	std::vector< float > arm_angle(arm_stack.size(), 0.0f);
+	
+	
 	glm::vec2 mouse = glm::vec2(0.0f, 0.0f); //mouse position in [-1,1]x[-1,1] coordinates
 
 	struct {
-		float radius = 5.0f;
-		float elevation = 0.0f;
+		float radius = 6.6f;
+		float elevation = 0.5f;
 		float azimuth = 0.0f;
 		glm::vec3 target = glm::vec3(0.0f, 0.0f, 0.0f);
 	} camera;
 
 	//------------ game loop ------------
+	
+	const Uint8 *keystate = SDL_GetKeyboardState(NULL);
 
 	bool should_quit = false;
 	while (true) {
@@ -257,15 +279,104 @@ int main(int argc, char **argv) {
 		previous_time = current_time;
 
 		{ //update game state:
-			//tree stack:
-			for (uint32_t i = 0; i < tree_stack.size(); ++i) {
-				wave_acc[i] += elapsed * (0.3f + 0.3f * i);
-				wave_acc[i] -= std::floor(wave_acc[i]);
-				float ang = (0.7f * float(M_PI)) * i;
-				tree_stack[i]->transform.rotation = glm::angleAxis(
-					std::cos(wave_acc[i] * 2.0f * float(M_PI)) * (0.2f + 0.1f * i),
-					glm::vec3(std::cos(ang), std::sin(ang), 0.0f)
-				);
+			//robot
+			SDL_PumpEvents();
+			{
+				if(keystate[SDL_SCANCODE_Z]) {
+					arm_angle[0] += elapsed;
+					if(arm_angle[0] >= 2 * M_PI) {
+						arm_angle[0] -= 2 * 3.1416f;
+					}
+				} else if(keystate[SDL_SCANCODE_X]) {
+					arm_angle[0] -= elapsed;
+					if(arm_angle[0] <= -2 * M_PI) {
+						arm_angle[0] += 2 * 3.1416f;
+					}
+				}
+				if(keystate[SDL_SCANCODE_A]) {	
+					if(arm_angle[1] <= M_PI / 2) {
+						arm_angle[1] += elapsed;
+					}
+				} else if(keystate[SDL_SCANCODE_S]) {
+					if(arm_angle[1] >= -M_PI / 2) {
+						arm_angle[1] -= elapsed;
+					}
+				}
+				if(keystate[SDL_SCANCODE_PERIOD]) {
+					if(arm_angle[2] <= 3 * M_PI / 4) {
+						arm_angle[2] += elapsed;
+					}
+				} else if(keystate[SDL_SCANCODE_SLASH]) {
+					if(arm_angle[2] >= -3 * M_PI / 4) {
+						arm_angle[2] -= elapsed;
+					}
+				}
+				if(keystate[SDL_SCANCODE_SEMICOLON]) {
+					if(arm_angle[3] <= 3 * M_PI / 4) {
+						arm_angle[3] += elapsed;
+					}
+				} else if(keystate[SDL_SCANCODE_APOSTROPHE]) {
+					if(arm_angle[3] >= -3 * M_PI / 4) {
+						arm_angle[3] -= elapsed;
+					}
+				}
+				
+				arm_stack[0]->transform.rotation = glm::angleAxis(arm_angle[0], glm::vec3(0.0f, 0.0f, 1.0f));
+				arm_stack[1]->transform.rotation = glm::angleAxis(arm_angle[1], glm::vec3(1.0f, 0.0f, 0.0f));
+				arm_stack[2]->transform.rotation = glm::angleAxis(arm_angle[2], glm::vec3(1.0f, 0.0f, 0.0f));
+				arm_stack[3]->transform.rotation = glm::angleAxis(arm_angle[3], glm::vec3(1.0f, 0.0f, 0.0f));
+			}
+			
+			//detect pop
+			glm::vec4 place = glm::mat4_cast(arm_stack[3]->transform.rotation) * glm::vec4(0.0f, 0.0f, 0.5f, 1.0f);
+			place += glm::vec4(0.0f, 0.0f, 1.2f, 0.0f);
+			place = glm::mat4_cast(arm_stack[2]->transform.rotation) * place;
+			place += glm::vec4(0.0f, 0.0f, 1.2f, 0.0f);
+			place = glm::mat4_cast(arm_stack[1]->transform.rotation) * place;
+			place += glm::vec4(0.0f, 0.0f, 0.6f, 0.0f);
+			place = glm::mat4_cast(arm_stack[0]->transform.rotation) * place;
+			
+			glm::vec3 point(place);
+			for (uint32_t i = 0; i < balloon_stack.size(); ++i) {
+				if(balloon_exist[i]) {
+					if(distance(point, balloon_stack[i]->transform.position) < 0.7f) {
+						switch(i) {
+							case 0:
+								poped_stack.emplace_back( &add_object("Balloon1-Pop", balloon_stack[i]->transform.position, balloon_stack[i]->transform.rotation, balloon_stack[i]->transform.scale));
+								break;
+							case 1:
+								poped_stack.emplace_back( &add_object("Balloon2-Pop", balloon_stack[i]->transform.position, balloon_stack[i]->transform.rotation, balloon_stack[i]->transform.scale));
+								break;
+							case 2:
+								poped_stack.emplace_back( &add_object("Balloon3-Pop", balloon_stack[i]->transform.position, balloon_stack[i]->transform.rotation, balloon_stack[i]->transform.scale));
+								break;
+						}
+						balloon_exist[i] = false;
+						balloon_stack[i]->transform.scale = glm::vec3(0.0f);
+						pop_time.emplace_back(1.0f);
+					}
+				}
+			}
+			
+			//balloon boucing
+			for (uint32_t i = 0; i < balloon_stack.size(); ++i) {
+				if(balloon_exist[i]) {
+					g_velocity[i] -= elapsed * 0.03f;
+					balloon_stack[i]->transform.position.z += g_velocity[i];
+					if(balloon_stack[i]->transform.position.z <= 0.7f) {
+						balloon_stack[i]->transform.position.z = 0.7f;
+						g_velocity[i] *= -1.01f;
+					}
+				}
+			}
+			
+			//poped
+			for (uint32_t i = 0; i < poped_stack.size(); ++i) {
+				if(pop_time[i]>0) {
+					pop_time[i] -= elapsed;
+				} else {
+					poped_stack[i]->transform.scale = glm::vec3(0.0f);
+				}
 			}
 
 			//camera:
