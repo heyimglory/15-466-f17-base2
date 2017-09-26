@@ -1,4 +1,4 @@
-# Hung-yu's implementation of [*Robot Fun Police*](http://graphics.cs.cmu.edu/courses/15-466-f17/game2-designs/jmccann/) for game2 in 15-466-f17.
+# Hung-yu's implementation of [*Robot Fun Police*](http://graphics.cs.cmu.edu/courses/15-466-f17/game2-designs/jmccann/) for game2 in 15-466-f17
 
 ![alt text](https://github.com/heyimglory/15-466-f17-base2/blob/master/screenshots/move.png)
 
