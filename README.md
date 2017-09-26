@@ -1,29 +1,20 @@
-NOTE: please fill in the first section with information about your game.
+# Hung-yu's implementation of [*Robot Fun Police*](http://graphics.cs.cmu.edu/courses/15-466-f17/game2-designs/jmccann/) for game2 in 15-466-f17.
 
-# *Game Title*
-
-*Game Title* is *Your Name*'s implementation of [*Design Document*](http://graphics.cs.cmu.edu/courses/15-466-f17/game2-designs/put-real-link-here) for game2 in 15-466-f17.
-
-*Include a Screenshot Here*
-
-## Build Notes
-
-*Include any special notes or steps required to build your game here. If there are no special notes, delete this section.*
+![alt text](https://github.com/heyimglory/15-466-f17-base2/blob/master/screenshots/move.png)
 
 ## Asset Pipeline
 
-*Briefly describe the asset pipeline for this game. What sorts of source files are used? How are they processed? How are they loaded?*
+The asset pipeline of this game is based on export-meshes.py provided in Base2. It reads out the data of the vertices from a blender file and writes them into binary blob files, which are the data of the meshes and the data of the scene. The blob files can be read by the main program directly because their format are adjusted to meet the loading functions. The part regarding the color of the verices is referencing export-layer.py.
 
 ## Architecture
 
-*Provide a brief introduction to how you implemented the design. Talk about the basic structure of your code.*
+After loading the data of the models from the blob files, a stack of the components of the robot and another stack of balloons are constructed before entering the loop. Inside the loop, the the movement of the robot would be up dated according to user input, and then whether the balloons are poped and the bouncing of the balloons are also handled.
 
 ## Reflection
 
-*Reflect on the assignment. What was difficult? What worked well? If you were doing it again, what would you change?*
+The part that I spended most time in this assignmet is trying to figure out how to export the models from blender. There were something needed to pay attention to regarding the path. Another part that took much time is trying to render the models with color. Adjustments were required in many files. Trying to recall how to detect the keyboard movement without relying on polling also took me quite a while. I kind of like the way that the balloons bounce although I only apply really simple computation to control their tranlation. The part I'm not really satisfied with is that I didn't remove the balloons from the scene when they are poped. I just scaled the dimensions to 0 so that it can't be seen. I would try to figure out how to remove them from the scene if I get more time.
 
-*Reflect on the design document. What was clear and what was ambiguous? How did you resolve the ambiguities?*
-
+I think the design document is brief but covered almost everything about the game since it not a complicated one. The only part I need to guess is what shoud I do when it says "the game is over."
 
 # About Base2
 
